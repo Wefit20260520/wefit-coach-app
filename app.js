@@ -5,7 +5,19 @@ const notice=s=>$('notice').textContent=s;
 let sb=null,user=null,tab='dashboard',members=[],lessons=[],purchases=[];
 if(url&&key){sb=createClient(url,key);notice('測試環境：目前僅能查看自己的資料，尚未開放管理員跨教練檢視。');sb.auth.onAuthStateChange((_e,s)=>{user=s?.user||null;setTimeout(refresh,0)});sb.auth.getUser().then(({data})=>{user=data.user;refresh()})}else{notice('尚未設定 Supabase：請依 README 建立免費專案並填寫 config.js。')}
 $('login').onsubmit=async e=>{e.preventDefault();if(!sb)return;const {error}=await sb.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)notice('登入失敗：'+error.message)};
-$('signup').onclick=async()=>{if(!sb)return;const {error,data}=await sb.auth.signUp({email:$('email').value,password:$('password').value});notice(error?'註冊失敗：'+error.message:data.session?'已註冊並登入':'註冊成功，請到信箱完成驗證後登入。')};
+$('signup').onclick=async()=>{
+  if(!sb){notice('尚未連接 Supabase，請確認 config.js 已上傳。');return;}
+  const email=$('email').value.trim();
+  const password=$('password').value;
+  if(!$('email').checkValidity() || !email){$('email').reportValidity();notice('請先填入有效的電子郵件。');return;}
+  if(!password || password.length<6){$('password').reportValidity();notice('請先填入至少 6 個字元的密碼。');return;}
+  $('signup').disabled=true;
+  try{
+    const {error,data}=await sb.auth.signUp({email,password});
+    notice(error?'註冊失敗：'+error.message:data.session?'已註冊並登入':'註冊成功，請到信箱完成驗證後登入。');
+  }catch(err){notice('註冊失敗：'+err.message)}
+  finally{$('signup').disabled=false;}
+};
 $('logout').onclick=()=>sb?.auth.signOut();document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});
 async function refresh(){const logged=!!user;$('auth').hidden=logged;$('app').hidden=!logged;$('identity').textContent=logged?user.email:'雲端測試版 V2';if(!logged)return;
 try{const [a,b,c]=await Promise.all(['members','lessons','purchases'].map(t=>sb.from(t).select('*').order('created_at',{ascending:false})));for(const r of [a,b,c])if(r.error)throw r.error;members=a.data;lessons=b.data;purchases=c.data;render()}catch(e){notice('讀取失敗：'+e.message)}}
